@@ -3,6 +3,7 @@ import os
 import sys
 import simple_ntp
 import time
+import logging
 
 
 NTP_UPDATE_PERIOD = 12*60*60  # seconds per update
@@ -22,13 +23,18 @@ def update_sys_time():
         date_str = simple_ntp.getNTPTime()
         os.system('date %s' % date_str)
     except:
-        pass
+        logging.exception("In update_sys_time")
     return True
 
 def send_time():
-    now = time.localtime()
-    #print "send_time(%d,%d)" % (now.tm_hour, now.tm_min)
-    snapCom.mcast_rpc(1, 2, 'tm', now.tm_hour, now.tm_min)
+    try:
+        now = time.localtime()
+        #print "send_time(%d,%d)" % (now.tm_hour, now.tm_min)
+        snapCom.mcast_rpc(1, 3, 'tm', now.tm_hour, now.tm_min)
+
+    except:
+        logging.exception("In send_time")
+        
     return True
         
 def main():
@@ -39,7 +45,11 @@ def main():
     
     # Create SNAP instance and establish serial (bridge) link
     snapCom = snap.Snap()
-    snapCom.open_serial(snap.SERIAL_TYPE_RS232, '/dev/ttyS1')
+    
+    # Configure SNAP Connect params
+    snapCom.save_nv_param(snap.NV_FEATURE_BITS_ID, 0x100)   # Send with RPC CRC
+    
+    snapCom.open_serial(snap.SERIAL_TYPE_RS232, '/dev/snap1')
     #snapCom.accept_tcp()
 
     # Schedule periodic events
@@ -49,6 +59,20 @@ def main():
     
 if __name__ == '__main__':
     main()
-    snapCom.loop()
+
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        filename='/tm_sender.log',
+                        filemode='w')    
+    
+    #logging.basicConfig(filename="/tm_sender.log", level=logging.DEBUG)
+    logging.debug('Starting tm_sender')
 
     
+    # Looping here just in case SNAP Connect fails
+    while True:
+        try:
+            snapCom.loop()
+        except:
+            logging.exception("In snapCom.loop")
+       

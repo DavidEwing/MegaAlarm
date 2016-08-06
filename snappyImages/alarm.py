@@ -33,6 +33,9 @@ MIN_4 = GPIO_15
 MIN_5 = GPIO_16
 MINUTES = (MIN_0, MIN_1, MIN_2, MIN_3, MIN_4, MIN_5)
 
+MASTER_TIMEOUT = 300
+master_tm_timeout = MASTER_TIMEOUT
+
 
 ENABLE = GPIO_17
 
@@ -98,7 +101,9 @@ def silence_alarm():
 
 def tm(hrs, min, sec):
     """RPC broadcast periodically by local gateway, sends time in local timezone"""
-    global trigger_min
+    global trigger_min, master_tm_timeout
+    master_tm_timeout = MASTER_TIMEOUT
+
     if hrs == hr_set and min == min_set:
         if min != trigger_min:
             # Haven't already triggered alarm in this minute
@@ -112,7 +117,13 @@ def tm(hrs, min, sec):
 
 @setHook(HOOK_1S)
 def alarm_sequence():
-    global active_alarm_seq, idx_active_alarm_seq
+    global active_alarm_seq, idx_active_alarm_seq, master_tm_timeout
+    
+    master_tm_timeout -= 1
+    if master_tm_timeout == 0:
+        #short_beep()   # Alert! We have no time source - alarm will not sound as scheduled!
+        master_tm_timeout = MASTER_TIMEOUT
+    
     if active_alarm_seq:
         if SILENT_DEBUG:
             print "beep! seq=", idx_active_alarm_seq, ", dur=", active_alarm_seq[idx_active_alarm_seq]
